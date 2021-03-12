@@ -41,3 +41,65 @@ To make it simpler, it supports insecure communications. I was following [instru
 Additionally I tried to do the same on Minikube. The only difference there is that I did not have to install metric server manually.
 It is part of Minikube addons and can be installed through [configuration](https://kubernetes.io/docs/tutorials/hello-minikube/)
 
+## Using Kafka
+
+One of the most common use cases for HPA on streaming applications is scaling based on the topic(s) lag.
+Let`s install Kafka strimzi with Prometheus and see how put it all together.
+
+Start by kind install, as described above and add metric server to it.
+
+Now follow a great [article](https://snourian.com/kafka-kubernetes-strimzi-part-3-monitoring-strimzi-kafka-with-prometheus-grafana/)
+
+Install Strimzi operator:
+* Create ns - `kubectl create ns kafka`
+* Add Helm repo -
+````  
+helm repo add strimzi https://strimzi.io/charts/
+helm repo update
+````  
+* Install Strimzi operator with Helm
+````
+helm install strimzi strimzi/strimzi-kafka-operator --namespace kafka
+````
+Create Kafka cluster. [Definition](kafka/kafka-metrics.yaml) is cloned [from](https://github.com/strimzi/strimzi-kafka-operator/blob/0.21.1/examples/metrics/kafka-metrics.yaml).
+Here, because we are running on Kind, we are using 1 zookeeper and 1 broker.
+File has metrics key for both kafka and zookeeper, it also need to add [Kafka Exporter](https://strimzi.io/docs/operators/latest/deploying.html#proc-kafka-exporter-configuring-str) configs 
+to enable [additional metrics](https://strimzi.io/blog/2019/10/14/improving-prometheus-metrics/). To create cluster run:
+````
+kubectl apply -f <your location>/kafka-metrics.yaml
+````
+
+Now we can install Prometheus operator. To ensure that it is deployed to monitoring ns
+we copied bundle [locally](kafka/bundle.yaml)
+````
+kubectl apply -f <your location>/bundle.yaml
+````
+
+Use [yaml](kafka/prometheus-additional.yaml) for additional scraping properties. Cloned from [here](https://github.com/strimzi/strimzi-kafka-operator/blob/0.21.1/examples/metrics/prometheus-additional-properties/prometheus-additional.yaml) to create secret:
+````
+kubectl apply -f prometheus-additional.yaml -n monitoring
+````
+Create strimzi monitor using this [yaml](kafka/strimzi-pod-monitor.yaml) cloned from [here](https://github.com/strimzi/strimzi-kafka-operator/blob/0.21.1/examples/metrics/prometheus-install/strimzi-pod-monitor.yaml)
+````
+kubectl apply -f <your location>/strimzi-pod-monitor.yaml -n monitoring
+````
+Create prometheus rules using this [yaml](kafka/prometheus-rules.yaml) cloned from [here](https://github.com/strimzi/strimzi-kafka-operator/blob/0.21.1/examples/metrics/prometheus-install/prometheus-rules.yaml)
+````
+kubectl apply -f <your location>/prometheus-rules.yaml -n monitoring
+````
+Create prometheus using this [yaml](kafka/prometheus.yaml) cloned from [here](https://github.com/strimzi/strimzi-kafka-operator/blob/0.21.1/examples/metrics/prometheus-install/prometheus.yaml)
+````
+kubectl apply -f <your location>/prometheus.yaml -n monitoring
+````
+Install Grafana using this [yaml](kafka/grafana.yaml) cloned from [here](https://github.com/strimzi/strimzi-kafka-operator/blob/0.21.1/examples/metrics/grafana-install/grafana.yaml)
+````
+kubectl apply -f <your location>/grafana.yaml -n monitoring
+````
+Expose grafana using port-forward:
+````
+kubectl port-forward svc/grafana 3000:3000 -n monitoring
+````
+Now go to `ocalhost:3000` to get to UI. Default credentials are admin/admin.
+Add Prometheus as a new Data Source. Inside the Settings tap, you need to enter Prometheus address - `http://prometheus-operated:9090` and validate that its
+working. Add dashboards to see the results. We used 4 - cloned from [here](https://github.com/strimzi/strimzi-kafka-operator/tree/0.21.1/examples/metrics/grafana-dashboards)
+
