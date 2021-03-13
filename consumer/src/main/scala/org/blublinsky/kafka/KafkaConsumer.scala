@@ -1,6 +1,5 @@
 package org.blublinsky.kafka
 
-import akka.Done
 import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.scaladsl.adapter._
@@ -34,9 +33,10 @@ object KafkaConsumer {
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
       .withStopTimeout(0.seconds)
 
-    val control: Consumer.DrainingControl[Done] = Consumer
+    // Read messages
+    Consumer
       .sourceWithOffsetContext(kafkaConsumerSettings, Subscriptions.topics(topic))
-      .map { consumerRecord => CloudEventMap.parseFrom(new ByteArrayInputStream(consumerRecord.value())) }
+      .map (record => CloudEventMap.parseFrom(new ByteArrayInputStream(record.value())))
       .map{event =>
         println(s"New event $event")
         Thread.sleep(sleep)
