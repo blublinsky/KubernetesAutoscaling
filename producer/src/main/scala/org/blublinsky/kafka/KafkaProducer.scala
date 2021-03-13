@@ -29,7 +29,6 @@ object KafkaProducer {
 
     // Actor system
     implicit val actorSystem: ActorSystem[Nothing] = ActorSystem[Nothing](Behaviors.empty, "kafka-producer")
-    import actorSystem.executionContext
 
     // Kafka setting
     val kafkaProducerSettings = ProducerSettings(actorSystem.toClassic, new ByteArraySerializer, new ByteArraySerializer)
