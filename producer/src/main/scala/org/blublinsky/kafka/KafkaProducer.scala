@@ -14,21 +14,20 @@ import org.apache.kafka.clients.producer.ProducerRecord
 import java.io.ByteArrayOutputStream
 import java.time.ZonedDateTime
 import java.util.UUID
-import scala.concurrent.duration._
+import Configuration._
 
 object KafkaProducer {
-
-  private val bootstrapServers = ""                           // Bootstrap server
-  private val topic = "cloudevents"                           // Topic
-
-  private val frequency: FiniteDuration = 500.millisecond     // Message emit frequency
 
   private var value: Long = -1
 
   def main(args: Array[String]): Unit = {
 
+    println(s"Kafka producer -  bootstrap servers : $bootstrapServers; topic : $topic; frequency : $frequency")
     // Actor system
     implicit val actorSystem: ActorSystem[Nothing] = ActorSystem[Nothing](Behaviors.empty, "kafka-producer")
+
+    // Create topic, if does not exist
+    KafkaSupport.createTopic()
 
     // Kafka setting
     val kafkaProducerSettings = ProducerSettings(actorSystem.toClassic, new ByteArraySerializer, new ByteArraySerializer)

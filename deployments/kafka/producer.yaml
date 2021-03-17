@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-producer-deployment
+  labels:
+    app: kafka-producer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka-producer
+  template:
+    metadata:
+      labels:
+        app: kafka-producer
+    spec:
+      containers:
+        - name: kafka-producer
+          image: blublinsky1/kafkaproducer:0.1
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: BOOTSTRAP
+              value: "my-cluster-kafka-bootstrap.kafka:9092"
+          resources:
+            requests:
+              cpu: "1m"
+            limits:
+              cpu: "100m"

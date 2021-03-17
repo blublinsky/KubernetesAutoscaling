@@ -12,19 +12,20 @@ import org.apache.kafka.clients.consumer.ConsumerConfig
 
 import java.io.ByteArrayInputStream
 import scala.concurrent.duration._
+import Configuration._
 
 object KafkaConsumer {
 
-  private val bootstrapServers = ""               // Bootstrap server
-  private val topic = "cloudevents"               // Topic
-  private val groupId = "cloudevents"             // group id
-
-  private val sleep = 2.second.toMillis           // Delay - 2 sec
-
   def main(args: Array[String]): Unit = {
+
+    println(s"Kafka consumer -  bootstrap servers : $bootstrapServers; topic : $topic; group id : $groupId; execution : $delay")
+    val sleep = delay.toMillis           // Delay - 2 sec
 
     // Actor system
     implicit val actorSystem: ActorSystem[Nothing] = ActorSystem[Nothing](Behaviors.empty, "kafka-producer")
+
+    // Create topic, if does not exist
+    KafkaSupport.createTopic()
 
     // configure Kafka consumer (1)
     val kafkaConsumerSettings = ConsumerSettings(actorSystem.toClassic, new ByteArrayDeserializer, new ByteArrayDeserializer)

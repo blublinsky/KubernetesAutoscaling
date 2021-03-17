@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-consumer-deployment
+  labels:
+    app: kafka-consumer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka-consumer
+  template:
+    metadata:
+      labels:
+        app: kafka-consumer
+    spec:
+      containers:
+        - name: kafka-consumer
+          image: blublinsky1/kafkaconsumer:0.1
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: BOOTSTRAP
+              value: "my-cluster-kafka-bootstrap.kafka:9092"
+            - name: DELAY
+              value: 100.millisecond
+          resources:
+            requests:
+              cpu: "1m"
+            limits:
+              cpu: "100m"
