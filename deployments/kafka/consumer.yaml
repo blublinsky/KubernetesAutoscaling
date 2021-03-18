@@ -22,7 +22,7 @@ spec:
             - name: BOOTSTRAP
               value: "my-cluster-kafka-bootstrap.kafka:9092"
             - name: DELAY
-              value: 100.millisecond
+              value: 1.second
           resources:
             requests:
               cpu: "1m"

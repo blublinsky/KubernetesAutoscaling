@@ -59,9 +59,9 @@ spec:
   entityOperator:
     topicOperator: {}
     userOperator: {}
-  kafkaExporter:
-    topicRegex: ".*"
-    groupRegex: ".*"
+#  kafkaExporter:
+#    topicRegex: ".*"
+#    groupRegex: ".*"
 ---
 kind: ConfigMap
 apiVersion: v1
