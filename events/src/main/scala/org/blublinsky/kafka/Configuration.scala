@@ -9,7 +9,7 @@ object Configuration {
 
   val bootstrapServers: String = config.as[String]("kafka.bootstrapServers")  // Bootstrap server
   val topic: String = config.as[String]("kafka.topic")                        // Topic
-  val partitions: Int = config.getOrElse[Int]("kafka.partitions", 30) // Partitions
+  val partitions: Int = config.getOrElse[Int]("kafka.partitions", 3)  // Partitions
   val groupId: String = config.getOrElse[String]("kafka.groupId", "cloudevents")  // Group ID
 
   val frequency: FiniteDuration = config.getOrElse[FiniteDuration]("kafka.frequency", 500.millisecond) // Message emit frequency
