@@ -112,19 +112,14 @@ kubectl apply -f <your location>/consumer.yaml
 kubectl apply -f <your location>/producer.yaml
 ````
 
-Now that we have a working example we can proceed to HPA
-
-
-
-
 Deploy Kafka consumer and producer:
 ````
 kubectl apply -f <your location>/consumer.yaml
 kubectl apply -f <your location>/producer.yaml
 ````
-***Note*** To see `Strimzi Kafka Exporter` chart correctly, make sure to set namespace and cluster name.
 
+Once consumer and producer are deployed, you can look at the grafana kafka exporter
+dashboard, that shows speed of producing and consuming messages and the lag,
+that can be used as an information for HPA
 
-
-
-
+![Grafana](images/consumer_lag.png)
