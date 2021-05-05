@@ -4,8 +4,7 @@ import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.scaladsl.adapter._
 import akka.kafka._
-import akka.kafka.scaladsl.Consumer
-import akka.stream.scaladsl.Sink
+import akka.kafka.scaladsl._
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import cloudevents.io.CloudEvent._
 import org.apache.kafka.clients.consumer.ConsumerConfig
@@ -13,6 +12,10 @@ import org.apache.kafka.clients.consumer.ConsumerConfig
 import java.io.ByteArrayInputStream
 import scala.concurrent.duration._
 import Configuration._
+import akka.Done
+import akka.kafka.scaladsl.Consumer.DrainingControl
+
+import scala.concurrent.{ExecutionContext, Future}
 
 object KafkaConsumer {
 
@@ -23,6 +26,9 @@ object KafkaConsumer {
 
     // Actor system
     implicit val actorSystem: ActorSystem[Nothing] = ActorSystem[Nothing](Behaviors.empty, "kafka-producer")
+    implicit val executionContext: ExecutionContext = actorSystem.executionContext
+
+    val committerSettings = CommitterSettings(actorSystem)
 
     // Create topic, if does not exist
     KafkaSupport.createTopic()
@@ -34,15 +40,21 @@ object KafkaConsumer {
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
       .withStopTimeout(0.seconds)
 
+    // Message processor
+    def processor(key: Array[Byte], value: Array[Byte]): Future[Done] = {
+      val event = CloudEventMap.parseFrom(new ByteArrayInputStream(value))
+      println(s"New event $event")
+      Thread.sleep(sleep)
+      Future.successful(Done)
+    }
     // Read messages
     Consumer
-      .sourceWithOffsetContext(kafkaConsumerSettings, Subscriptions.topics(topic))
-      .map (record => CloudEventMap.parseFrom(new ByteArrayInputStream(record.value())))
-      .map{event =>
-        println(s"New event $event")
-        Thread.sleep(sleep)
-        event
+      .committableSource(kafkaConsumerSettings, Subscriptions.topics(topic))
+      .mapAsync(1) { msg =>
+        processor(msg.record.key, msg.record.value)
+          .map(_ => msg.committableOffset)
       }
-      .toMat(Sink.ignore)(Consumer.DrainingControl.apply).run()
+      .toMat(Committer.sink(committerSettings))(DrainingControl.apply)
+      .run()
   }
 }

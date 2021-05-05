@@ -18,8 +18,8 @@ priorityClassName: ""
 
 # Url to access prometheus
 prometheus:
-  # Value is templated (adjusted for an example)
-  url: http://prometheus-operated.monitoring.svc
+  # Value is templated
+  url: http://prometheus.default.svc
   port: 9090
   path: ""
 

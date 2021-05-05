@@ -66,17 +66,15 @@ Here, because we are running on Kind, we are using 1 zookeeper and 1 broker.
 File has metrics key for both kafka and zookeeper, it also need to add [Kafka Exporter](https://strimzi.io/docs/operators/latest/deploying.html#proc-kafka-exporter-configuring-str) configs 
 to enable [additional metrics](https://strimzi.io/blog/2019/10/14/improving-prometheus-metrics/). To create cluster run:
 ````
-kubectl apply -f <your location>/kafka-metrics.yaml
+kubectl apply -f <your location>/kafka-metrics.yaml -n kafka
 ````
 More info on Kafka exporter configuration is [here](https://strimzi.io/docs/operators/latest/full/deploying.html#proc-kafka-exporter-configuring-str)
 Detail description (along with installation chart) is [here](https://github.com/danielqsj/kafka_exporter)
 
-It looks like Strimzi does not install Kafka exporter correctly. Try to comment out exporter from 
-[kafka-metrics](deployments/kafka/kafka-metrics.yaml) and install it using the following helm chart:
+Create namespace monitoring:
+
 ````
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm repo update
-helm install my-cluster-kafka-exporter prometheus-community/prometheus-kafka-exporter --set kafkaServer={my-cluster-kafka-bootstrap:9092} --set prometheus.serviceMonitor.enabled=true --namespace kafka
+kubectl create ns monitoring
 ````
 Now we can install Prometheus operator. To ensure that it is deployed to monitoring ns
 we copied bundle [locally](deployments/kafka/bundle.yaml)
@@ -86,7 +84,7 @@ kubectl apply -f <your location>/bundle.yaml
 
 Use [yaml](deployments/kafka/prometheus-additional.yaml) for additional scraping properties. Cloned from [here](https://github.com/strimzi/strimzi-kafka-operator/blob/0.21.1/examples/metrics/prometheus-additional-properties/prometheus-additional.yaml) to create secret:
 ````
-kubectl apply -f prometheus-additional.yaml -n monitoring
+kubectl apply -f <your location>/prometheus-additional.yaml -n monitoring
 ````
 Create strimzi monitor using this [yaml](deployments/kafka/strimzi-pod-monitor.yaml) cloned from [here](https://github.com/strimzi/strimzi-kafka-operator/blob/0.21.1/examples/metrics/prometheus-install/strimzi-pod-monitor.yaml)
 ````
@@ -107,6 +105,17 @@ kubectl port-forward svc/grafana 3000:3000 -n monitoring
 Now go to `localhost:3000` to get to UI. Default credentials are admin/admin.
 Add Prometheus as a new Data Source. Inside the Settings tap, you need to enter Prometheus address - `http://prometheus-operated:9090` and validate that its
 working. Add dashboards to see the results. We used 4 - cloned from [here](https://github.com/strimzi/strimzi-kafka-operator/tree/0.21.1/examples/metrics/grafana-dashboards)
+
+Deploy Kafka consumer and producer:
+````
+kubectl apply -f <your location>/consumer.yaml
+kubectl apply -f <your location>/producer.yaml
+````
+
+Now that we have a working example we can proceed to HPA
+
+
+
 
 Deploy Kafka consumer and producer:
 ````
