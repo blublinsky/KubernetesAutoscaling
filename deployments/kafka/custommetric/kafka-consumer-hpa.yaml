@@ -1,0 +1,28 @@
+kind: HorizontalPodAutoscaler
+apiVersion: autoscaling/v2beta2
+metadata:
+  name: kafka-consumer-hpa
+spec:
+  scaleTargetRef:
+    # point the HPA at the kafka consumer
+    # you created above
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kafka-consumer-deployment
+  # autoscale between 1 and 10 replicas
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+    # use an "Object" metric. These metrics describe a different object in the same namespace, instead of describing Pods
+    - type: Object
+      object:
+        metric:
+          name: kafka_consumergroup_lag
+        describedObject:
+          kind: "Pod"
+#          namespace: "kafka"
+          name: "my-cluster-kafka-exporter-9774b9f48-jq5hs"
+          apiVersion: apps/v1
+        target:
+          type: AverageValue
+          averageValue: 5

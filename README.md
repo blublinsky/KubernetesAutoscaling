@@ -6,6 +6,9 @@ The complete e-2-e walkthrough for the implementation based on Prometheus adapte
 An example for OpenShift can be found [here](https://docs.openshift.com/container-platform/4.1/monitoring/exposing-custom-application-metrics-for-autoscaling.html). 
 
 Quick validation based on [this](https://blog.kloia.com/kubernetes-hpa-externalmetrics-prometheus-acb1d8a4ed50)
+and leverages HPA
+
+![Grafana](images/hpa.png)
 
 * Install kind. On Mac this is easy [using brew](https://kind.sigs.k8s.io/docs/user/quick-start/). Do not forget to set
 [docker parameters](https://kind.sigs.k8s.io/docs/user/quick-start/#settings-for-docker-desktop) for it.
@@ -32,7 +35,7 @@ To make it simpler, it supports insecure communications. I was following [instru
     * Create a Prometheus Service using [this yaml](deployments/custommetric/prometheus_service.yaml) by running `kubectl apply -f <your location>/prometheus_service.yaml`. To access the service run `kubectl port-forward svc/prometheus 9090` and go to `http://localhost:9090/` to see UI
   * Create service monitor using [this yaml](deployments/custommetric/servicemonitor.yaml) by running `kubectl apply -f <your location>/servicemonitor.yaml`. With the monitor in place, go to Prometheus UI and you should see your metrics `http_requests_total`. You should see something like
     `http_requests_total{container="metrics-provider",endpoint="http",instance="10.244.0.16:8080",job="sample-app",namespace="default",pod="sample-app-7cfb596f98-pkv8t",service="sample-app"}	20`
-  * Creating Prometheus Adapter done using Helm chart as described [here](https://github.com/prometheus-community/helm-charts/tree/main/charts/prometheus-adapter). Alternatively you can use yaml files located in [this directory](deployments/custommetric)
+  * Creating Prometheus Adapter done using Helm chart as described [here](https://github.com/prometheus-community/helm-charts/tree/main/charts/prometheus-adapter). 
   * To verify that everything is installed correctly run `kubectl get --raw /apis/custom.metrics.k8s.io/v1beta1` and make sure that `"name":"pods/http_requests","singularName":"","namespaced":true,"kind":"MetricValueList","verbs":["get"]` is there.
   * Check the value of the metric `kubectl get --raw "/apis/custom.metrics.k8s.io/v1beta1/namespaces/default/pods/*/http_requests?selector=app%3Dsample-app"`
   * Create the HorizontalPodAutoscaler using [this yaml](deployments/custommetric/sample-app-hpa.yaml) by running `kubectl apply -f <your location>/sample-app-hpa.yaml`.
@@ -112,6 +115,8 @@ kubectl apply -f <your location>/consumer.yaml
 kubectl apply -f <your location>/producer.yaml
 ````
 
+***Note*** in order for kafka consumers to be scalable, make sure that you have enough partitions in the kafka deployment
+
 Deploy Kafka consumer and producer:
 ````
 kubectl apply -f <your location>/consumer.yaml
@@ -123,3 +128,96 @@ dashboard, that shows speed of producing and consuming messages and the lag,
 that can be used as an information for HPA
 
 ![Grafana](images/consumer_lag.png)
+
+Usage HPA with Kafka is described [here](https://medium.com/@ranrubin/horizontal-pod-autoscaling-hpa-triggered-by-kafka-event-f30fe99f3948)
+
+Install prometheus adapter using [Helm chart](https://github.com/prometheus-community/helm-charts/tree/main/charts/prometheus-adapter)
+
+````
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+helm install prometheus-adapter prometheus-community/prometheus-adapter -f /Users/boris/Projects/KubernetesAutoscaling/deployments/kafka/custommetric/values.yaml --namespace monitoring
+````
+To validate the installation run the following command:
+
+````
+kubectl get --raw /apis/custom.metrics.k8s.io/v1beta1 | jq .
+````
+It shold return:
+
+````
+{
+  "kind": "APIResourceList",
+  "apiVersion": "v1",
+  "groupVersion": "custom.metrics.k8s.io/v1beta1",
+  "resources": [
+    {
+      "name": "pods/kafka_consumergroup_lag",
+      "singularName": "",
+      "namespaced": true,
+      "kind": "MetricValueList",
+      "verbs": [
+        "get"
+      ]
+    }
+  ]
+}
+````
+To see the metrics value run:
+
+````
+get --raw "/apis/custom.metrics.k8s.io/v1beta1/namespaces/kafka/pods/*/kafka_consumergroup_lag" | jq .
+````
+Note in the above that we specify namespace kafka here. This is because kafka exporter, that collects 
+this information runs in namespace kafka.
+
+Running this command return:
+
+````
+{
+  "kind": "MetricValueList",
+  "apiVersion": "custom.metrics.k8s.io/v1beta1",
+  "metadata": {
+    "selfLink": "/apis/custom.metrics.k8s.io/v1beta1/namespaces/kafka/pods/%2A/kafka_consumergroup_lag"
+  },
+  "items": [
+    {
+      "describedObject": {
+        "kind": "Pod",
+        "namespace": "kafka",
+        "name": "my-cluster-kafka-exporter-9774b9f48-jq5hs",
+        "apiVersion": "/v1"
+      },
+      "metricName": "kafka_consumergroup_lag",
+      "timestamp": "2021-05-07T16:05:56Z",
+      "value": "2",
+      "selector": null
+    }
+  ]
+}
+````
+When we look at the metric value, we notice that it returns data only for an exporter pod.
+This means that in the HPA we need to use a custom metrics not of the object that we are 
+scaling (kafka consumer), but rather another object - kafka exporter.
+As defined [here](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/#autoscaling-on-multiple-metrics-and-custom-metrics)
+The object metrics describe a different object in the same namespace, instead of describing Pods. 
+The metrics are not necessarily fetched from the object; they only describe it. 
+Based on this, an HPA yaml is defined as [folows](deployments/kafka/custommetric/kafka-consumer-hpa.yaml).
+We can apply this using:
+````
+kubectl apply -f <your-location>kafka-consumer-hpa.yaml -n kafka
+````
+***Note*** Because object metrics requires that the object is in the namespace as the scaling pod, kafka producers and consumers (and HPA) have to be deployed in the same namespace
+as kafka exporter
+
+Now we can verify that everything is working correctly:
+
+````
+kubectl get hpa kafka-consumer-hpa -n kafka
+````
+Which returns:
+````
+NAME                 REFERENCE                              TARGETS         MINPODS   MAXPODS   REPLICAS   AGE
+kafka-consumer-hpa   Deployment/kafka-consumer-deployment   3875m/5 (avg)   1         10        4          90m
+````
+***Note*** that average value specified in HPA configuration is per pod.
