@@ -221,3 +221,64 @@ NAME                 REFERENCE                              TARGETS         MINP
 kafka-consumer-hpa   Deployment/kafka-consumer-deployment   3875m/5 (avg)   1         10        4          90m
 ````
 ***Note*** that average value specified in HPA configuration is per pod.
+
+## Using KEDA
+
+This is based on the [article](https://faun.pub/event-driven-autoscaling-for-kubernetes-with-kafka-keda-d68490200812)
+
+[KEDA](https://keda.sh/) is a Kubernetes-based Event Driven Autoscaler. With KEDA, you can drive the scaling of any 
+container in Kubernetes based on the number of events needing to be processed.KEDA works alongside standard Kubernetes 
+components like the horizontal pod autoscaler (HPA) and can extend functionality without overwriting or duplication.
+
+![Keda](images/keda.png)
+
+To install Keda run the following set of command:
+
+````
+helm repo add kedacore https://kedacore.github.io/charts
+helm repo update
+kubectl create namespace keda
+helm install keda kedacore/keda --namespace keda
+````
+Install Strimzi and kafka instance, as above:
+
+````
+helm repo add strimzi https://strimzi.io/charts/
+helm repo update
+kubectl create namespace kafka
+helm install strimzi strimzi/strimzi-kafka-operator --namespace kafka
+kubectl apply -f <your location>/kafka-metrics.yaml -n kafka
+````
+Install Prometheus and Grafana as above
+
+````
+kubectl create ns monitoring
+kubectl apply -f <your location>/bundle.yaml
+kubectl apply -f <your location>/prometheus-additional.yaml -n monitoring
+kubectl apply -f <your location>/strimzi-pod-monitor.yaml -n monitoring
+kubectl apply -f <your location>/prometheus.yaml -n monitoring
+kubectl apply -f <your location>/grafana.yaml -n monitoring
+````
+Start consumer and producer as above using:
+
+````
+kubectl apply -f <your location>/consumer.yaml
+kubectl apply -f <your location>/producer.yaml
+````
+To start autoscaling, create a keda `ScaledObject` as shown [here](deployments/keda/kafka-scaled-object.yaml)
+and deploy it with the following command:
+
+````
+kubectl create -f  <your location>/kafka-scaled-object.yaml
+````
+To make sure that keda is running, execute:
+
+````
+kubectl get ScaledObject
+````
+
+You should see:
+````
+NAME                 SCALETARGETKIND      SCALETARGETNAME             MIN   MAX   TRIGGERS   AUTHENTICATION   READY   ACTIVE   AGE
+kafka-scaledobject   apps/v1.Deployment   kafka-consumer-deployment   1     10    kafka                       True    True     8m38s
+````
