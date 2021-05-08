@@ -14,5 +14,6 @@ spec:
         # Required
         bootstrapServers: my-cluster-kafka-bootstrap.kafka.svc:9092 # Kafka bootstrap server host and port
         consumerGroup: cloudevents  # Make sure that this consumer group name is the same one as the one that is consuming topics
-        topic: cloudevents
-        lagThreshold: "10" # Optional. How much the stream is lagging on the current consumer group
+        topic: cloudevents # Name of the topic on which processing the offset lag.
+        offsetResetPolicy: latest # The offset reset policy for the consumer
+        lagThreshold: "10" # Average target value to trigger scaling actions
